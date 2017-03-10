@@ -1,0 +1,19 @@
+# Example
+version: "2"
+services:
+  mariadb:
+    image: seuf/mariadb
+    hostname: mariadb
+    container_name: mariadb
+    environment:
+      DATABASES: "foo,bar"
+      DB_USER_foo: "foo_user"
+      DB_PASS_foo: "foofoo"
+      DB_USER_bar: "bar"
+      DB_PASS_bar: "babar"
+    volumes:
+      - /data/docker/volumes/mariadb:/var/lib/mysql
+    expose:
+      - 3306
+    ports:
+      - "3306:3306"

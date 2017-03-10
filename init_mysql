@@ -1,0 +1,68 @@
+#!/bin/bash
+set -e
+
+
+DBNAMES=""
+MYSQL_CHARSET=${MYSQL_CHARSET:-"utf8"}
+MYSQL_COLLATION=${MYSQL_COLLATION:-"utf8_general_ci"}
+
+
+# Checking directories
+echo "Initializong directories..."
+mkdir -p ${MYSQL_DATA_DIR}
+chmod -R 0700 ${MYSQL_DATA_DIR}
+chown -R ${MYSQL_USER}:${MYSQL_USER} ${MYSQL_DATA_DIR}
+#echo "OK\n"
+
+# Checking for mysql Data directory
+if [[ ! -d ${MYSQL_DATA_DIR}/mysql ]]; then
+    echo "Installing mysql database..."
+    su ${MYSQL_USER} -s /bin/ash -c mysql_install_db 2>&1
+fi
+
+_ensure_mysql_running() {
+    #Checking mysql is running (Thank you to Sameersbn)
+    timeout=15
+    while ! /usr/bin/mysqladmin -u root status > /dev/null 2>&1
+    do
+        timeout=$(($timeout -1))
+        if [[ $timeout -eq 0 ]]; then
+            echo -e "\nCould not connect to database server. Aborting..."
+            exit 1
+        fi
+        echo -n "."
+        sleep 1
+    done
+}
+
+
+#Creating new user and database;
+/usr/bin/mysqld_safe >/dev/null 2>&1 &
+
+_ensure_mysql_running
+
+for DB_NAME in $(awk -F',' '{for (i = 1 ; i <= NF ; i++) print $i}' <<< "${DATABASES}"); do
+    if [[ -n "${DB_NAME}" ]]; then
+        echo "Creating database \"${DB_NAME}\"..."
+        mysql -u root -e "CREATE DATABASE IF NOT EXISTS $DB_NAME DEFAULT CHARACTER SET $MYSQL_CHARSET COLLATE $MYSQL_COLLATION;"
+        DB_USER_VAR="DB_USERç$DB_NAME"
+        DB_USER=$DB_NAME
+        if [[ -n "${!DB_USER_VAR}" ]]; then
+            DB_USER=${!DB_USER_VAR}
+        fi
+        DB_PASS="DB_PASS_$DB_NAME"
+        if [[ -n "${!DB_PASS}" ]]; then
+            echo "Granting access to database \"$DB_NAME\" for user \"${DB_USER}\"..."
+            echo "mysql -u root -e \"GRANT ALL PRIVILEGES ON $DB_NAME.* TO '${DB_USER}'@'%' IDENTIFIED BY '${!DB_PASS}';\""
+            mysql -u root -e "GRANT ALL PRIVILEGES ON $DB_NAME.* TO '${DB_USER}'@'%' IDENTIFIED BY '${!DB_PASS}';"
+        else
+            echo "Missing DB_PASS_$DB_NAME environment variable. aborting..."
+            /usr/bin/mysqladmin -u root shutdown
+            exit
+        fi
+    fi
+done
+
+/usr/bin/mysqladmin -u root shutdown
+
+exec "$@"
