@@ -44,7 +44,7 @@ for DB_NAME in $(awk -F',' '{for (i = 1 ; i <= NF ; i++) print $i}' <<< "${DATAB
     if [[ -n "${DB_NAME}" ]]; then
         echo "Creating database \"${DB_NAME}\"..."
         mysql -u root -e "CREATE DATABASE IF NOT EXISTS $DB_NAME DEFAULT CHARACTER SET $MYSQL_CHARSET COLLATE $MYSQL_COLLATION;"
-        DB_USER_VAR="DB_USERç$DB_NAME"
+        DB_USER_VAR="DB_USER_$DB_NAME"
         DB_USER=$DB_NAME
         if [[ -n "${!DB_USER_VAR}" ]]; then
             DB_USER=${!DB_USER_VAR}
